@@ -1,0 +1,303 @@
+# Jetson_YOLOv5
+
+Jetson TX2 and Jetson Nano deploy YOLOv5 model.
+
+## Jetson TX2 YOLOv5 Pest Detection Model Deployment
+
+1. Below are the steps for deploying the YOLOv5 pest detection model on Jetson TX2.
+
+2. The entire Jetson TX2 flashing process was completed yesterday and today. The full flashing process will be added later.
+
+3. Now, let's start with the YOLOv5 model deployment on Jetson TX2. I will document some operations and issues encountered along the way.
+
+### Step 1: Install `jtop` to View TX2 Basic Information
+
+```bash
+sudo apt-get install python3-pip
+sudo -H pip3 install -U jetson-stats
+# Then restart the system
+jtop
+Focus on the basic information as shown below:
+
+
+
+
+Step 2: Install Archiconda (Virtual Environment Management Tool)
+Download link: Archiconda Releases
+
+./Archiconda3-0.2.3-Linux-aarch64.sh
+sudo chmod -R 777 /home
+./Archiconda3-0.2.3-Linux-aarch64.sh
+vim ~/.bashrc
+# Add the following lines at the end
+export OPENBLAS_CORETYPE=ARMV8
+export PATH=~/home/anaconda3/bin:$PATH
+# Save and exit
+source ~/.bashrc
+Step 3: Configure CUDA
+
+vi .bashrc
+# Scroll to the bottom and add these lines
+export PATH=/usr/local/cuda-10.2/bin${PATH:+:${PATH}}
+export LD_LIBRARY_PATH=/usr/local/cuda-10.2/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+export CUDA_ROOT=/usr/local/cuda
+
+source ~/.bashrc
+nvcc -V
+
+
+Step 4: Create a Virtual Environment
+
+conda create -n yolov5_js python=3.6
+Step 5: Install pip3 and Necessary Libraries
+
+sudo apt-get update
+sudo apt-get install python3-pip python3-dev -y
+sudo apt-get install build-essential make cmake cmake-curses-gui -y
+sudo apt-get install git g++ pkg-config curl -y
+sudo apt-get install libatlas-base-dev gfortran libcanberra-gtk-module libcanberra-gtk3-module -y
+sudo apt-get install libhdf5-serial-dev hdf5-tools -y
+sudo apt-get install nano locate screen -y
+Step 6: Install Required Dependencies
+
+sudo apt-get install libfreetype6-dev -y
+sudo apt-get install protobuf-compiler libprotobuf-dev openssl -y
+sudo apt-get install libssl-dev libcurl4-openssl-dev -y
+sudo apt-get install cython3 -y
+Step 7: Install System-Level Dependencies for OpenCV
+
+sudo apt-get install build-essential -y
+sudo apt-get install cmake git libgtk2.0-dev pkg-config libavcodec-dev libavformat-dev libswscale-dev -y
+sudo apt-get install python-dev python-numpy libtbb2 libtbb-dev libjpeg-dev libpng-dev libtiff5-dev libdc1394-22-dev -y
+sudo apt-get install libavcodec-dev libavformat-dev libswscale-dev libv4l-dev liblapacke-dev -y
+sudo apt-get install libxvidcore-dev libx264-dev -y
+sudo apt-get install libatlas-base-dev gfortran -y
+sudo apt-get install ffmpeg -y
+Step 8: Update CMake
+
+wget http://www.cmake.org/files/v3.13/cmake-3.13.0.tar.gz
+tar xpvf cmake-3.13.0.tar.gz cmake-3.13.0/  # Extract the files
+cd cmake-3.13.0/
+./bootstrap --system-curl  # This may take a while...
+make -j4  # Compile; this will also take some time...
+echo 'export PATH=~/cmake-3.13.0/bin/:$PATH' >> ~/.bashrc
+source ~/.bashrc  # Update .bashrc
+Step 9: Install PyTorch
+Since Jetson devices use an ARM architecture, many packages are not compatible with typical Linux distributions. Therefore, the PyTorch package should be downloaded from the NVIDIA website. Here, we choose torch=1.8 and torchvision=0.9 to match the JetPack and Python versions.
+
+
+pip3 install torch-1.8.0-cp36-cp36m-linux_aarch64.whl
+# Avoid using sudo to prevent installing torch in an external environment.
+After installation, you can import cv2 for testing:
+
+
+python3
+import torch
+print(torch.__version__)
+Step 10: Install TorchVision
+Pre-install the environment dependencies:
+
+
+sudo apt-get install libopenmpi2
+sudo apt-get install libopenblas-dev
+sudo apt-get install libjpeg-dev zlib1g-dev
+Navigate to the torchvision folder:
+
+
+export BUILD_VERSION=0.9.0
+python setup.py install
+# After installation, test with the following commands:
+python
+import torchvision
+print(torchvision.__version__)
+print(torch.cuda.is_available())
+
+
+If Pillow version 9.2.0 is installed, you may encounter an error in Python 3 environments with the following traceback: SyntaxError: future feature annotations is not defined. You can downgrade Pillow as follows:
+
+
+pip3 install pillow==8.4.0
+Step 11: Set Up the YOLOv5 Environment
+
+pip install -r requirements.txt
+# Install any missing dependencies.
+Step 12: Run the Detection Code
+
+python3 detect.py --weights yolo-16.pt
+
+
+Step 13: Model Training
+
+python3 train.py
+Using a USB Camera on Jetson
+Step 1: Install v4l2-utils
+
+sudo apt install v4l-utils 
+Step 2: Check USB Camera Connection
+
+v4l2-ctl --list-devices
+
+
+Step 3: Verify Camera Operation
+
+nvgstcapture-1.0 --camsrc=0 --cap-dev-node=1
+You should now see the camera's video feed.
+
+Step 4: Modify detect.py Code
+Change the --source parameter to the camera's device number (e.g., video0).
+
+Step 5: Run the YOLO Detection Model for Real-Time Detection
+
+python3 detect.py --weights yolo-16.pt --source 0
+
+
+Setting USB Camera Resolution on Jetson
+Explanation
+Since USB cameras support various resolutions and frame rates, higher resolutions can slow down model performance. Setting an appropriate resolution can help improve detection accuracy and speed.
+
+Steps
+Step 1: List Camera Devices
+
+sudo v4l2-ctl --list-devices
+In this case, the TX2 camera is identified as video0.
+
+Step 2: View Camera Parameters
+
+sudo v4l2-ctl --device=/dev/video1 --all  # View all parameters of /dev/video1 camera
+sudo v4l2-ctl -d /dev/video0 --list-formats  # View supported video compression formats
+sudo v4l2-ctl -d /dev/video0 --list-formats-ext  # View supported resolutions and frame rates
+Step 3: Set Camera Parameters
+
+sudo v4l2-ctl -d /dev/video0 --set-parm=30  # Set frame rate
+sudo v4l2-ctl --list-framesizes=MJPG -d /dev/video0  # View supported resolutions
+sudo v4l2-ctl --set-fmt-video=width=640,height=480,pixelformat=YUYV
+Step 4: Run the Model and Verify the Parameters
+
+
+Accelerating the Model with TensorRT on Jetson TX2
+Create a Symbolic Link
+TensorRT is installed at /usr/lib/python3.6/dist-packages/tensorrt/. Use the following command to create a symbolic link in your virtual environment (replace the path with your Archiconda installation directory; the path shown here is for reference only):
+
+
+sudo ln -s /usr/lib/python3.6/dist-packages/tensorrt* /home/archiconda3/envs/yolov5_js/lib/python3.6/site-packages
+Check the Version
+
+>>> python
+>>> import tensorrt
+>>> tensorrt.__version__
+Running export.py and detect.py
+After completing the steps above, TensorRT is now available as a package. You can run the following command in the terminal:
+
+
+python export.py --weights yolo-16.pt --include engine --device 0 
+This will generate a .engine file. You can then execute detect.py with:
+
+
+python detect.py --weights yolo-16.engine
+Schedule Tasks with Cron
+Step 1: Check if Cron is Installed
+Step 2: Create a cron_script.cron File
+
+nano cron_script.cron
+vi cron_script.cron
+gedit cron_script.cron
+Step 3: Add Commands to cron_script.cron File
+
+0 9 * * * /bin/sh /home/lyd/dingshi.sh >> /home/lyd/Desktop/custom_log.log
+0 15 * * * /bin/sh /home/lyd/dingshi.sh >> /home/lyd/Desktop/custom_log.log
+0 18 * * * /bin/sh /home/lyd/dingshi.sh >> /home/lyd/Desktop/custom_log.log
+Step 4: Add the Cron Job
+
+crontab cron_script.cron
+Step 5: Verify Cron Job
+
+crontab -l
+
+
+Step 6: Write the dingshi.sh Script
+
+#!/bin/bash
+
+# Activate the conda environment using absolute path
+source /home/lyd/archiconda3/bin/activate yolov5_js
+
+# Navigate to the directory
+cd yolov5_plant
+
+# Run the Python script
+timeout 300s python3 detect.py --weights yolo-16.engine --source 0
+psshutdown /h /t 0
+Step 7: Write the Test Script ceshi.sh
+
+#!/bin/bash
+
+# Print success message
+echo "Success! The script is now running."
+
+# Print the current time
+echo "Current time: $(date)"
+
+# Print environment variables
+echo "Environment variables:"
+printenv
+
+# Execute other commands or scripts
+# command_to_execute
+
+# Print completion message
+echo "Execution completed."
+psshutdown /h /t 0
+Step 8: Test the Cron Job
+
+*/5 * * * * /bin/sh /home/lyd/ceshi.sh >> /home/lyd/Desktop/test_log.log
+Step 9: Verify Execution
+
+
+You should see the task running every five minutes.
+
+Step 10: Write a Wake-Up Script for 8:55 AM
+
+#!/bin/bash
+
+# Activate the conda environment using absolute path
+source /home/lyd/archiconda3/bin/activate yolov5_js
+
+# Navigate to the directory
+cd yolov5_plant
+
+# Run the Python script
+timeout 300s python3 detect.py --weights yolo-16.engine --source 0
+current_hour=$(date +%H)
+current_minute=$(date +%M)
+current_time=$((current_hour*60 + current_minute))
+target_time=$((8*60 + 55))  # 8:55 AM in minutes
+time_until_target=$((target_time - current_time - 1))
+
+rtcwake -m no -s "$time_until_target"
+Step 11: Test Script
+
+# Print success message
+echo "Success! The script is now running."
+
+# Print the current time
+echo "Current time: $(date)"
+
+# Print environment variables
+echo "Environment variables:"
+printenv
+
+# Calculate the current time in minutes
+current_hour=$(date +%H)
+current_minute=$(date +%M)
+current_time=$((current_hour * 60 + current_minute))
+
+# Calculate the time five minutes from now
+target_time=$((current_time + 5))
+
+# Set the system to wake up in five minutes
+rtcwake -m no -s "$((target_time * 60))"  # Wake up without power-off
+
+# Additional task commands here
+
+# Wait for the task to complete
+echo "Execution completed."
